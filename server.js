@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
+app.use(express.json()); // Allow JSON payload parsing
 
 // Ensure logs directory exists
 const logsDir = path.join(__dirname, 'logs');
@@ -29,6 +30,27 @@ app.get('/api/logs', (req, res) => {
     const csvFiles = files.filter(f => f.endsWith('.csv')).sort().reverse();
     res.json(csvFiles);
   });
+});
+
+// NEW: API to receive telemetry from Python / Quectel
+app.post('/api/telemetry', (req, res) => {
+  const data = req.body;
+  if (!data) return res.status(400).json({ error: 'No payload provided' });
+
+  // Update the global telemetry state
+  simulatedTelemetry = { ...simulatedTelemetry, ...data };
+
+  // Broadcast to all connected WebSockets
+  const fullState = { ...simulatedTelemetry, isLogging };
+  const payload = JSON.stringify({ type: 'TELEMETRY_UPDATE', data: fullState });
+  
+  wss.clients.forEach(client => {
+    if (client.readyState === 1) { 
+      client.send(payload);
+    }
+  });
+
+  res.status(200).json({ success: true });
 });
 
 // Serve Vue static files from 'dist' folder (Production Build)
@@ -72,96 +94,7 @@ let simulatedTelemetry = {
   }
 };
 
-let autoSimulate = true;
 let isLogging = false;
-let logFileStream = null;
-
-const getLocalTimeStr = () => {
-  const d = new Date();
-  const pad = (n) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-};
-
-const getLocalFileTimeStr = () => {
-  const d = new Date();
-  const pad = (n) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
-};
-
-const startLogging = () => {
-  if (isLogging) return;
-  const dateStr = getLocalFileTimeStr();
-  const filename = `telemetry_${dateStr}.csv`;
-  const filepath = path.join(logsDir, filename);
-  
-  logFileStream = fs.createWriteStream(filepath, { flags: 'a' });
-  // Write CSV Header
-  logFileStream.write('Timestamp,Speed(km/h),SoC(%),CurrentDraw(A),BatteryVoltage(V),MaxCellV(V),MinCellV(V),AvgTemp(C),MotorTemp(C),InverterTemp(C),FaultyCell,ShutdownActive\n');
-  isLogging = true;
-};
-
-const stopLogging = () => {
-  if (!isLogging) return;
-  if (logFileStream) {
-    logFileStream.end();
-    logFileStream = null;
-  }
-  isLogging = false;
-};
-
-// 100ms Simulation Loop
-setInterval(() => {
-  if (autoSimulate) {
-    if (simulatedTelemetry.speed > 0 || Math.random() > 0.8) {
-      simulatedTelemetry.speed += (Math.random() - 0.4) * 5;
-      if (simulatedTelemetry.speed < 0) simulatedTelemetry.speed = 0;
-      if (simulatedTelemetry.speed > 150) simulatedTelemetry.speed = 150;
-    }
-    
-    if (simulatedTelemetry.speed > 10) {
-      simulatedTelemetry.soc -= (simulatedTelemetry.speed / 1000);
-      if (simulatedTelemetry.soc < 0) simulatedTelemetry.soc = 0;
-    }
-
-    simulatedTelemetry.currentDraw = simulatedTelemetry.speed * 1.5 + (Math.random() * 10 - 5);
-    simulatedTelemetry.instantConsumption = simulatedTelemetry.speed > 0 ? (simulatedTelemetry.currentDraw * simulatedTelemetry.batteryVoltage) / 1000 : 0; 
-
-    if (simulatedTelemetry.currentDraw > 50) {
-      simulatedTelemetry.motorTemp += 0.1;
-      simulatedTelemetry.inverterTemp += 0.05;
-      simulatedTelemetry.averageTemp += 0.02;
-    } else {
-      simulatedTelemetry.motorTemp -= 0.05;
-      simulatedTelemetry.inverterTemp -= 0.02;
-      simulatedTelemetry.averageTemp -= 0.01;
-    }
-    if (simulatedTelemetry.motorTemp < 25) simulatedTelemetry.motorTemp = 25;
-    if (simulatedTelemetry.inverterTemp < 25) simulatedTelemetry.inverterTemp = 25;
-    if (simulatedTelemetry.averageTemp < 25) simulatedTelemetry.averageTemp = 25;
-
-    simulatedTelemetry.maxCellVoltage = 3.0 + (simulatedTelemetry.soc / 100) * 1.2;
-    simulatedTelemetry.minCellVoltage = simulatedTelemetry.maxCellVoltage - Math.random() * 0.05;
-
-    simulatedTelemetry.modules.forEach((mod, index) => {
-      const heatFactor = (index === 2 || index === 3) ? 1.05 : 0.98;
-      const baseTemp = simulatedTelemetry.averageTemp * heatFactor + (Math.random() * 0.5);
-      mod.maxT = baseTemp + (Math.random() * 0.8);
-      mod.minT = baseTemp - (Math.random() * 0.8);
-    });
-    
-    simulatedTelemetry.batteryVoltage = ((simulatedTelemetry.maxCellVoltage + simulatedTelemetry.minCellVoltage) / 2) * 108; 
-  }
-
-  // Include logging state in telemetry to sync UI
-  const fullState = { ...simulatedTelemetry, isLogging };
-  const payload = JSON.stringify({ type: 'TELEMETRY_UPDATE', data: fullState });
-  
-  wss.clients.forEach(client => {
-    if (client.readyState === 1) { 
-      client.send(payload);
-    }
-  });
-}, 100);
 
 // 1-second Logging Loop
 setInterval(() => {
@@ -182,17 +115,7 @@ wss.on('connection', (ws) => {
       const msg = JSON.parse(message);
       if (msg.type === 'SIMULATION_COMMAND') {
         const cmd = msg.data;
-        if (cmd.action === 'TOGGLE_AUTO') autoSimulate = !autoSimulate;
-        else if (cmd.action === 'SET_SPEED') simulatedTelemetry.speed = cmd.value;
-        else if (cmd.action === 'SET_SOC') simulatedTelemetry.soc = cmd.value;
-        else if (cmd.action === 'CUTOFF_CELL') {
-          simulatedTelemetry.faultyCell = cmd.value;
-        } else if (cmd.action === 'SET_MOTOR_TEMP') {
-          simulatedTelemetry.motorTemp = cmd.value;
-        } else if (cmd.action === 'TOGGLE_SHUTDOWN') {
-          const key = cmd.value;
-          simulatedTelemetry.shutdownCircuit[key] = !simulatedTelemetry.shutdownCircuit[key];
-        } else if (cmd.action === 'START_LOGGING') {
+        if (cmd.action === 'START_LOGGING') {
           startLogging();
         } else if (cmd.action === 'STOP_LOGGING') {
           stopLogging();

@@ -5,12 +5,9 @@ import BatteryPack from './components/BatteryPack.vue';
 import ThermalGrid from './components/ThermalGrid.vue';
 import BatteryModules from './components/BatteryModules.vue';
 import CellGrid from './components/CellGrid.vue';
-import Simulator from './components/Simulator.vue';
 import ShutdownCircuit from './components/ShutdownCircuit.vue';
 import DataLogger from './components/DataLogger.vue';
-import { Sliders, Clock } from 'lucide-vue-next';
-
-const isSimulatorOpen = ref(true);
+import { Clock } from 'lucide-vue-next';
 
 const telemetry = ref({
   speed: 0,
@@ -153,19 +150,6 @@ onUnmounted(() => {
 
     <!-- Shutdown Safety Bar (At the very bottom) -->
     <ShutdownCircuit :circuit="telemetry.shutdownCircuit" />
-
-    <!-- Simulator Sidebar -->
-    <Simulator 
-      v-if="isSimulatorOpen"
-      @command="sendCommand" 
-      @close="isSimulatorOpen = false"
-      :telemetry="telemetry" 
-    />
-
-    <!-- Re-open Simulator Button -->
-    <button v-if="!isSimulatorOpen" class="reopen-sim-btn glass-panel" @click="isSimulatorOpen = true" title="Open Simulator">
-      <Sliders size="24" class="icon" />
-    </button>
   </div>
 </template>
 
