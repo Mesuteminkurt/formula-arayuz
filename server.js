@@ -36,7 +36,7 @@ const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 
 // Catch-all route to serve Vue's index.html for SPA routing
-app.get('*', (req, res) => {
+app.get(/(.*)/, (req, res) => {
   if (fs.existsSync(path.join(distPath, 'index.html'))) {
     res.sendFile(path.join(distPath, 'index.html'));
   } else {
