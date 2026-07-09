@@ -59,19 +59,21 @@ app.post('/api/telemetry', (req, res) => {
     }));
   }
 
-  // Bitmask expansion for Shutdown Circuit (9 bits)
-  if (shortData.sc !== undefined) {
+  // Object expansion for Shutdown Circuit ('t' or 'f')
+  if (shortData.sc !== undefined && typeof shortData.sc === 'object') {
     const sc = shortData.sc;
+    const isTrue = (val) => val === 't' || val === true || val === 1 || val === '1';
+    
     fullData.shutdownCircuit = {
-      ts: !!(sc & (1 << 0)),
-      hvd: !!(sc & (1 << 1)),
-      testpoint: !!(sc & (1 << 2)),
-      battTerm: !!(sc & (1 << 3)),
-      bspd: !!(sc & (1 << 4)),
-      estopL: !!(sc & (1 << 5)),
-      estopR: !!(sc & (1 << 6)),
-      crash: !!(sc & (1 << 7)),
-      estopC: !!(sc & (1 << 8))
+      ts: isTrue(sc.ts),
+      hvd: isTrue(sc.hvd),
+      testpoint: isTrue(sc.testpoint),
+      battTerm: isTrue(sc.battTerm),
+      bspd: isTrue(sc.bspd),
+      estopL: isTrue(sc.estopL),
+      estopR: isTrue(sc.estopR),
+      crash: isTrue(sc.crash),
+      estopC: isTrue(sc.estopC)
     };
   }
 

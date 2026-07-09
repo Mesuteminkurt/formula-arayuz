@@ -80,9 +80,18 @@ while True:
             [m["maxT"], m["minT"]] for m in modules
         ],
         
-        # Shutdown Circuit Bitmask (Hpsi True ise 511. Binary: 111111111)
-        # STM32 C kodunda: int sc = (ts<<0) | (hvd<<1) | (testpoint<<2) ... 
-        "sc": 511 
+        # Shutdown Circuit ('t' veya 'f' olarak string gönderebilirsiniz)
+        "sc": {
+            "ts": "t", 
+            "hvd": "t", 
+            "testpoint": "t", 
+            "battTerm": "t", 
+            "bspd": "t", 
+            "estopL": "t", 
+            "estopR": "t", 
+            "crash": "t", 
+            "estopC": "t"
+        } 
     }
 
     try:
