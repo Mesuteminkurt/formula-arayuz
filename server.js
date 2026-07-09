@@ -90,7 +90,7 @@ app.post('/api/telemetry', (req, res) => {
     }
   });
 
-  res.status(200).json({ success: true });
+  res.status(200).end();
 });
 
 // Serve Vue static files from 'dist' folder (Production Build)
