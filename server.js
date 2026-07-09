@@ -32,13 +32,51 @@ app.get('/api/logs', (req, res) => {
   });
 });
 
-// NEW: API to receive telemetry from Python / Quectel
+// NEW: API to receive compressed telemetry from Python / STM32
 app.post('/api/telemetry', (req, res) => {
-  const data = req.body;
-  if (!data) return res.status(400).json({ error: 'No payload provided' });
+  const shortData = req.body;
+  if (!shortData) return res.status(400).json({ error: 'No payload provided' });
+
+  // Expand shortData to fullData for the UI
+  const fullData = {};
+  if (shortData.s !== undefined) fullData.speed = shortData.s;
+  if (shortData.c !== undefined) fullData.soc = shortData.c;
+  if (shortData.a !== undefined) fullData.currentDraw = shortData.a;
+  if (shortData.ic !== undefined) fullData.instantConsumption = shortData.ic;
+  if (shortData.v !== undefined) fullData.batteryVoltage = shortData.v;
+  if (shortData.mxv !== undefined) fullData.maxCellVoltage = shortData.mxv;
+  if (shortData.mnv !== undefined) fullData.minCellVoltage = shortData.mnv;
+  if (shortData.at !== undefined) fullData.averageTemp = shortData.at;
+  if (shortData.mt !== undefined) fullData.motorTemp = shortData.mt;
+  if (shortData.it !== undefined) fullData.inverterTemp = shortData.it;
+  if (shortData.fc !== undefined) fullData.faultyCell = shortData.fc;
+  
+  if (shortData.m !== undefined && Array.isArray(shortData.m)) {
+    fullData.modules = shortData.m.map((mod, idx) => ({
+      id: idx + 1,
+      maxT: mod[0],
+      minT: mod[1]
+    }));
+  }
+
+  // Bitmask expansion for Shutdown Circuit (9 bits)
+  if (shortData.sc !== undefined) {
+    const sc = shortData.sc;
+    fullData.shutdownCircuit = {
+      ts: !!(sc & (1 << 0)),
+      hvd: !!(sc & (1 << 1)),
+      testpoint: !!(sc & (1 << 2)),
+      battTerm: !!(sc & (1 << 3)),
+      bspd: !!(sc & (1 << 4)),
+      estopL: !!(sc & (1 << 5)),
+      estopR: !!(sc & (1 << 6)),
+      crash: !!(sc & (1 << 7)),
+      estopC: !!(sc & (1 << 8))
+    };
+  }
 
   // Update the global telemetry state
-  simulatedTelemetry = { ...simulatedTelemetry, ...data };
+  simulatedTelemetry = { ...simulatedTelemetry, ...fullData };
 
   // Broadcast to all connected WebSockets
   const fullState = { ...simulatedTelemetry, isLogging };
