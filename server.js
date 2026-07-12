@@ -137,27 +137,34 @@ let simulatedTelemetry = {
 let isLogging = false;
 let logFileStream = null;
 
-const getLocalTimeStr = () => {
-  const d = new Date();
-  const pad = (n) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+// Türkiye saati (UTC+3) ile zaman damgası
+const getTurkeyTimeStr = () => {
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Istanbul',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false
+  }).formatToParts(new Date());
+  const g = (type) => parts.find(p => p.type === type)?.value || '';
+  return `${g('year')}-${g('month')}-${g('day')} ${g('hour')}:${g('minute')}:${g('second')}`;
 };
 
-const getLocalFileTimeStr = () => {
-  const d = new Date();
-  const pad = (n) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+// Dosya adı için Türkiye saati
+const getTurkeyFileTimeStr = () => {
+  return getTurkeyTimeStr().replace(/ /g, '_').replace(/:/g, '-');
 };
+
+// Ondalık noktayı virgüle çevir (Türkçe Excel formatı)
+const toTR = (val, decimals) => val.toFixed(decimals).replace('.', ',');
 
 const startLogging = () => {
   if (isLogging) return;
-  const dateStr = getLocalFileTimeStr();
+  const dateStr = getTurkeyFileTimeStr();
   const filename = `telemetry_${dateStr}.csv`;
   const filepath = path.join(logsDir, filename);
   
   logFileStream = fs.createWriteStream(filepath, { flags: 'a' });
-  logFileStream.write('sep=,\n');
-  logFileStream.write('Timestamp,Speed(km/h),SoC(%),CurrentDraw(A),BatteryVoltage(V),MaxCellV(V),MinCellV(V),AvgTemp(C),MotorTemp(C),InverterTemp(C),FaultyCell,ShutdownActive\n');
+  logFileStream.write('Timestamp;Speed(km/h);SoC(%);CurrentDraw(A);BatteryVoltage(V);MaxCellV(V);MinCellV(V);AvgTemp(C);MotorTemp(C);InverterTemp(C);FaultyCell;ShutdownActive\n');
   isLogging = true;
 };
 
@@ -169,12 +176,13 @@ const stopLogging = () => {
   }
   isLogging = false;
 };
+
 // 1-second Logging Loop
 setInterval(() => {
   if (isLogging && logFileStream) {
-    const ts = getLocalTimeStr();
-    const isShutdown = Object.values(simulatedTelemetry.shutdownCircuit).some(v => v === false); // If any circuit is false, it's a shutdown state
-    const line = `${ts},${simulatedTelemetry.speed.toFixed(1)},${simulatedTelemetry.soc.toFixed(1)},${simulatedTelemetry.currentDraw.toFixed(1)},${simulatedTelemetry.batteryVoltage.toFixed(1)},${simulatedTelemetry.maxCellVoltage.toFixed(2)},${simulatedTelemetry.minCellVoltage.toFixed(2)},${simulatedTelemetry.averageTemp.toFixed(1)},${simulatedTelemetry.motorTemp.toFixed(1)},${simulatedTelemetry.inverterTemp.toFixed(1)},${simulatedTelemetry.faultyCell || 'None'},${isShutdown}\n`;
+    const ts = getTurkeyTimeStr();
+    const isShutdown = Object.values(simulatedTelemetry.shutdownCircuit).some(v => v === false);
+    const line = `${ts};${toTR(simulatedTelemetry.speed, 1)};${toTR(simulatedTelemetry.soc, 1)};${toTR(simulatedTelemetry.currentDraw, 1)};${toTR(simulatedTelemetry.batteryVoltage, 1)};${toTR(simulatedTelemetry.maxCellVoltage, 2)};${toTR(simulatedTelemetry.minCellVoltage, 2)};${toTR(simulatedTelemetry.averageTemp, 1)};${toTR(simulatedTelemetry.motorTemp, 1)};${toTR(simulatedTelemetry.inverterTemp, 1)};${simulatedTelemetry.faultyCell || 'None'};${isShutdown}\n`;
     logFileStream.write(line);
   }
 }, 1000);
