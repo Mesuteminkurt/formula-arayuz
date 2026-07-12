@@ -156,6 +156,7 @@ const startLogging = () => {
   const filepath = path.join(logsDir, filename);
   
   logFileStream = fs.createWriteStream(filepath, { flags: 'a' });
+  logFileStream.write('sep=,\n');
   logFileStream.write('Timestamp,Speed(km/h),SoC(%),CurrentDraw(A),BatteryVoltage(V),MaxCellV(V),MinCellV(V),AvgTemp(C),MotorTemp(C),InverterTemp(C),FaultyCell,ShutdownActive\n');
   isLogging = true;
 };
