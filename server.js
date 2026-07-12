@@ -135,7 +135,39 @@ let simulatedTelemetry = {
 };
 
 let isLogging = false;
+let logFileStream = null;
 
+const getLocalTimeStr = () => {
+  const d = new Date();
+  const pad = (n) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
+const getLocalFileTimeStr = () => {
+  const d = new Date();
+  const pad = (n) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+};
+
+const startLogging = () => {
+  if (isLogging) return;
+  const dateStr = getLocalFileTimeStr();
+  const filename = `telemetry_${dateStr}.csv`;
+  const filepath = path.join(logsDir, filename);
+  
+  logFileStream = fs.createWriteStream(filepath, { flags: 'a' });
+  logFileStream.write('Timestamp,Speed(km/h),SoC(%),CurrentDraw(A),BatteryVoltage(V),MaxCellV(V),MinCellV(V),AvgTemp(C),MotorTemp(C),InverterTemp(C),FaultyCell,ShutdownActive\n');
+  isLogging = true;
+};
+
+const stopLogging = () => {
+  if (!isLogging) return;
+  if (logFileStream) {
+    logFileStream.end();
+    logFileStream = null;
+  }
+  isLogging = false;
+};
 // 1-second Logging Loop
 setInterval(() => {
   if (isLogging && logFileStream) {
