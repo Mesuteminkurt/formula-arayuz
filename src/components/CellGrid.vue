@@ -31,7 +31,7 @@ const modules = computed(() => {
   return modArray;
 });
 
-const isSystemFaulty = computed(() => props.faultyCell !== null);
+const isSystemFaulty = computed(() => props.faultyCell !== null && props.faultyCell !== 0);
 </script>
 
 <template>

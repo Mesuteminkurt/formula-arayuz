@@ -49,7 +49,7 @@ app.post('/api/telemetry', (req, res) => {
   if (shortData.at !== undefined) fullData.averageTemp = shortData.at;
   if (shortData.mt !== undefined) fullData.motorTemp = shortData.mt;
   if (shortData.it !== undefined) fullData.inverterTemp = shortData.it;
-  if (shortData.fc !== undefined) fullData.faultyCell = shortData.fc;
+  if (shortData.fc !== undefined) fullData.faultyCell = shortData.fc === 0 ? null : shortData.fc;
   
   if (shortData.m !== undefined && Array.isArray(shortData.m)) {
     fullData.modules = shortData.m.map((mod, idx) => ({
